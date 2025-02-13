@@ -1,6 +1,5 @@
 import java.io.*;
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 
 public class ColumnValidator {
@@ -8,14 +7,23 @@ public class ColumnValidator {
     public static void main(String[] args) {
         // Check if minimum arguments are provided
         if (args.length < 2) {
-            System.out.println("Usage: java -jar ColumnValidator.jar <file_path> <separator_ascii> [charset] [remove_bad_rows]");
+            System.out.println("Usage: java -jar ColumnValidator.jar <file_path> <separator_ascii> [charset - default is cp1252 known as Windows-1252] [remove_bad_rows]");
             return;
         }
 
         String filePath = args[0];
         char separator = (char) Integer.parseInt(args[1]);
-        String charsetName = (args.length >= 3 && !args[2].isEmpty()) ? args[2] : "ISO-8859-2"; // Default to ISO-8859-2
-        boolean removeBadRows = (args.length >= 4 && args[3].equalsIgnoreCase("remove_bad_rows"));
+        boolean removeBadRows  = false;
+        String charsetName = "cp1252"; // charset from data services
+        if (args.length >= 3 && args[2].equalsIgnoreCase("remove_bad_rows")){
+        	removeBadRows = true;
+        }
+        else if(!args[2].isEmpty()) {
+        	charsetName = args[2];
+        }
+        if (args.length >= 4 && args[3].equalsIgnoreCase("remove_bad_rows")){
+        	removeBadRows = true;
+        }
 
         String logFilePath = filePath.replace(".txt", "_validation_log.txt");
         String badRowsFilePath = filePath.replace(".txt", "_bad_rows.txt");
@@ -48,6 +56,7 @@ public class ColumnValidator {
 
                 String[] headers = headerLine.split(Character.toString(separator));
                 int expectedColumns = headers.length;
+                System.out.println("Opening and writing files using charset: " + charset.displayName());
                 System.out.println("Expected column count: " + expectedColumns);
 
                 String line;
@@ -58,7 +67,7 @@ public class ColumnValidator {
 
                     if (values.length != expectedColumns) {
                         // Log and save bad rows
-                        StringBuilder logEntry = new StringBuilder("Line " + lineNumber + ": ");
+                        StringBuilder logEntry = new StringBuilder("Line " + lineNumber + " expected columns " +expectedColumns+" received "+values.length+" details: ");
                         for (int j = 0; j < values.length; j++) {
                             String headerName = (j < headers.length) ? headers[j] : "UNKNOWN";
                             logEntry.append("\"").append(headerName).append("\"=>").append(values[j]).append("<<; ");
