@@ -1,7 +1,7 @@
 import java.io.*;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
-import java.util.*;
 
 public class ColumnValidator {
 
@@ -23,56 +23,65 @@ public class ColumnValidator {
 
         try {
             Charset charset = Charset.forName(charsetName);
-            List<String> lines = Files.readAllLines(Paths.get(filePath), charset);
-
-            if (lines.isEmpty()) {
-                System.out.println("The file is empty.");
-                return;
-            }
-
-            // Read header and determine column count
-            String[] headers = lines.get(0).split(Character.toString(separator));
-            int expectedColumns = headers.length;
-            System.out.println("Expected column count: " + expectedColumns);
-
-            List<String> badRows = new ArrayList<>();
-            List<String> goodRows = new ArrayList<>();
-            goodRows.add(lines.get(0)); // Always add header
-            badRows.add(lines.get(0));  // Add header to bad rows file
 
             try (
+                BufferedReader reader = Files.newBufferedReader(Paths.get(filePath), charset);
                 BufferedWriter logWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(logFilePath), charset));
-                BufferedWriter badRowsWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(badRowsFilePath), charset))
+                BufferedWriter badRowsWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(badRowsFilePath), charset));
+                BufferedWriter cleanedWriter = removeBadRows
+                        ? new BufferedWriter(new OutputStreamWriter(new FileOutputStream(cleanedFilePath), charset))
+                        : null
             ) {
-                for (int i = 1; i < lines.size(); i++) {
-                    String line = lines.get(i);
+                String headerLine = reader.readLine();
+                if (headerLine == null) {
+                    System.out.println("The file is empty.");
+                    return;
+                }
+
+                // Write header to bad rows file and cleaned file if needed
+                badRowsWriter.write(headerLine);
+                badRowsWriter.newLine();
+                if (removeBadRows) {
+                    cleanedWriter.write(headerLine);
+                    cleanedWriter.newLine();
+                }
+
+                String[] headers = headerLine.split(Character.toString(separator));
+                int expectedColumns = headers.length;
+                System.out.println("Expected column count: " + expectedColumns);
+
+                String line;
+                int lineNumber = 1;
+                while ((line = reader.readLine()) != null) {
+                    lineNumber++;
                     String[] values = line.split(Character.toString(separator), -1); // Preserve empty values
 
                     if (values.length != expectedColumns) {
-                        StringBuilder logEntry = new StringBuilder("Line " + (i + 1) + ": ");
+                        // Log and save bad rows
+                        StringBuilder logEntry = new StringBuilder("Line " + lineNumber + ": ");
                         for (int j = 0; j < values.length; j++) {
                             String headerName = (j < headers.length) ? headers[j] : "UNKNOWN";
                             logEntry.append("\"").append(headerName).append("\"=>").append(values[j]).append("<<; ");
                         }
-
                         logWriter.write(logEntry.toString().trim() + "\n");
-                        badRowsWriter.write(line + "\n");
-                        badRows.add(line);
+                        badRowsWriter.write(line);
+                        badRowsWriter.newLine();
                     } else {
-                        goodRows.add(line);
+                        // Save valid row if remove_bad_rows is active
+                        if (removeBadRows) {
+                            cleanedWriter.write(line);
+                            cleanedWriter.newLine();
+                        }
                     }
                 }
+
+                System.out.println("Validation complete. Check '" + logFilePath + "' for details.");
+                System.out.println("Bad rows saved in '" + badRowsFilePath + "'.");
+                if (removeBadRows) {
+                    System.out.println("Cleaned file without bad rows saved as '" + cleanedFilePath + "'.");
+                }
+
             }
-
-            System.out.println("Validation complete. Check '" + logFilePath + "' for details.");
-            System.out.println("Bad rows saved in '" + badRowsFilePath + "'.");
-
-            // Remove bad rows if requested
-            if (removeBadRows) {
-                Files.write(Paths.get(cleanedFilePath), goodRows, charset);
-                System.out.println("Cleaned file without bad rows saved as '" + cleanedFilePath + "'.");
-            }
-
         } catch (IOException e) {
             System.err.println("Error reading file: " + e.getMessage());
         } catch (NumberFormatException e) {
