@@ -1,6 +1,5 @@
 import java.io.*;
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 
@@ -39,6 +38,7 @@ public class ColumnValidator {
             List<String> badRows = new ArrayList<>();
             List<String> goodRows = new ArrayList<>();
             goodRows.add(lines.get(0)); // Always add header
+            badRows.add(lines.get(0));  // Add header to bad rows file
 
             try (
                 BufferedWriter logWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(logFilePath), charset));
